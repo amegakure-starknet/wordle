@@ -1,3 +1,6 @@
+mod store;
+mod constants;
+
 mod models {
     mod data {
         mod wordle;
@@ -9,6 +12,7 @@ mod models {
     }
     mod states {
         mod word_attemps;
+        mod player_score;
     }
 }
 
@@ -18,9 +22,6 @@ mod systems {
     mod ranking_system;
     // mod point;
 }
-
-
-mod store;
 
 #[cfg(test)]
 mod tests {

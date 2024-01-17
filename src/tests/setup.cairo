@@ -11,14 +11,14 @@ mod setup {
 
     // Internal imports
 
-    use wordle::models::data::wordle::{GameStats, PlayerStats};
+    use wordle::models::data::wordle::{next_word, NextWord, player_daily_state, PlayerDailyState};
     use wordle::models::entities::{
-        player::Player,
-        ranking::Ranking,
-        ranking::RankingCount,
-        word::Word,
+        player::player, player::Player,
+        ranking::ranking, ranking::Ranking,
+        ranking::ranking_count, ranking::RankingCount,
+        word::word, word::Word,
     };
-    use wordle::models::states::word_attemps::PlayerWordAttempts;
+    use wordle::models::states::word_attemps::{player_word_attempts, PlayerWordAttempts};
 
     use wordle::systems::guess_system::{guess_system, IGuessSystemDispatcher};
     use wordle::systems::ranking_system::{ranking_system, IRankingSystemDispatcher};
@@ -40,12 +40,12 @@ mod setup {
     fn spawn_game() -> (IWorldDispatcher, Systems) {
         // [Setup] World
         let models = array![
-            GameStats::TEST_CLASS_HASH,
-            PlayerStats::TEST_CLASS_HASH,
-            Player::TEST_CLASS_HASH,
-            Ranking::TEST_CLASS_HASH,
-            Word::TEST_CLASS_HASH,
-            PlayerWordAttempts::TEST_CLASS_HASH,
+            next_word::TEST_CLASS_HASH,
+            player_daily_state::TEST_CLASS_HASH,
+            player::TEST_CLASS_HASH,
+            ranking::TEST_CLASS_HASH,
+            word::TEST_CLASS_HASH,
+            player_word_attempts::TEST_CLASS_HASH,
         ];
 
         let world = spawn_test_world(models);

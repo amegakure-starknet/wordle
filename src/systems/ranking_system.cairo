@@ -3,7 +3,7 @@ use wordle::models::entities::ranking::Ranking;
 
 #[starknet::interface]
 trait IRankingSystem<TContractState> {
-    fn update(self: @TContractState, player: felt252, score: u64);
+    // fn update(self: @TContractState, player: felt252, score: u64);
 }
 
 #[dojo::contract]
@@ -16,37 +16,38 @@ mod ranking_system {
     use alexandria_sorting::merge_sort::merge;
     use alexandria_data_structures::array_ext::ArrayTraitExt;
 
-    use debug::PrintTrait;
-
     const RANKING_MAX_LEN: u32 = 20;
 
+    #[storage]
+    struct Storage {}
+
     #[external(v0)]
-    impl RankingSystem of IRankingSystem<ContractState> {
-        fn update(self: @ContractState, player: felt252, score: u64) {
-            // [Setup] Datastore
-            let mut store: Store = StoreTrait::new(self.world());
-            let ranking_count = store.get_ranking_count(RANKING_COUNT_KEY).index;
+    impl RankingSystem of IRankingSystem<ContractState> {}
 
-            if ranking_count >= RANKING_MAX_LEN {
-                let last_ranking = store.get_ranking(RANKING_MAX_LEN - 1);
-                if score > last_ranking.score {
-                    let (mut top_20, was_top_player) = get_rankings(
-                        ref store, player, RANKING_MAX_LEN, score
-                    );
-                    let sorted = merge(top_20);
-                    set_rankings(ref store, sorted);
-                    if !was_top_player {
-                        store.set_ranking_count(RankingCountTrait::new(ranking_count + 1));
-                    }
-                }
-            } else {
-                let (top, was_top_player) = get_rankings(ref store, player, ranking_count, score);
-                let sorted = merge(top);
+    fn update(world: IWorldDispatcher, player: felt252, score: u64) {
+        // [Setup] Datastore
+        let mut store: Store = StoreTrait::new(world);
+        let ranking_count = store.get_ranking_count(RANKING_COUNT_KEY).index;
+
+        if ranking_count >= RANKING_MAX_LEN {
+            let last_ranking = store.get_ranking(RANKING_MAX_LEN - 1);
+            if score > last_ranking.score {
+                let (mut top_20, was_top_player) = get_rankings(
+                    ref store, player, RANKING_MAX_LEN, score
+                );
+                let sorted = merge(top_20);
                 set_rankings(ref store, sorted);
-
                 if !was_top_player {
                     store.set_ranking_count(RankingCountTrait::new(ranking_count + 1));
                 }
+            }
+        } else {
+            let (top, was_top_player) = get_rankings(ref store, player, ranking_count, score);
+            let sorted = merge(top);
+            set_rankings(ref store, sorted);
+
+            if !was_top_player {
+                store.set_ranking_count(RankingCountTrait::new(ranking_count + 1));
             }
         }
     }

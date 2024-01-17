@@ -1,4 +1,4 @@
-const RANKING_COUNT_KEY: felt252 = 'ranking_key';
+use wordle::constants::RANKING_COUNT_KEY;
 
 #[derive(Model, Copy, Drop, Serde)]
 struct Ranking {

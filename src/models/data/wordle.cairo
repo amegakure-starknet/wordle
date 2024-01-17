@@ -1,18 +1,18 @@
 use starknet::ContractAddress;
 
 #[derive(Model, Copy, Drop, Serde)]
-struct GameStats {
+struct NextWord {
     #[key]
-    id: u32,
-    next_word_position: u32,
+    id: u64,
+    day: u64,
 }
 
 #[derive(Model, Copy, Drop, Serde)]
-struct PlayerStats {
+struct PlayerDailyState {
     #[key]
     player: ContractAddress,
     #[key]
     epoc_day: u64,
     won: bool,
-    remaining_tries: u8
+    remaining_tries: u8,
 }

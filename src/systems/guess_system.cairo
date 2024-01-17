@@ -13,7 +13,7 @@ mod guess_system {
     use starknet::{ContractAddress, get_caller_address};
     
     use wordle::store::{Store, StoreTrait};
-    use wordle::models::data::wordle::{GameStats, PlayerStats};
+    use wordle::models::data::wordle::PlayerDailyState;
     use wordle::models::entities::{
         player::Player,
         ranking::Ranking,
@@ -21,7 +21,10 @@ mod guess_system {
         word::Word,
     };
     use wordle::models::states::word_attemps::PlayerWordAttempts;
-    
+    use wordle::systems::ranking_system::ranking_system;
+    use debug::PrintTrait;
+    use wordle::constants::DAY_EPOC_DIVISOR;
+
     const GREEN: u32 = 3;
     const YELLOW: u32 = 2;
     const GRAY: u32 = 1;
@@ -34,21 +37,26 @@ mod guess_system {
     const TOTAL_DAILY_TRIES: u8 = 6;
     const WORDS_LEN: u32 = 5;
 
+    mod Errors {
+        const OUT_OF_ATTEMPTS: felt252 = 'ERR: You have no more attempts';
+        const ALREADY_WON: felt252 = 'ERR: You already won today';
+    }
+
     #[external(v0)]
     impl GuessSystem of IGuessSystem<ContractState> {
         fn update(self: @ContractState, attempt: u32) {
             // [Setup] Datastore
             let mut store: Store = StoreTrait::new(self.world());
 
-            let epoc_day = starknet::get_block_timestamp() / 86400;
-            let mut player_stats = store.get_player_stats(get_caller_address(), epoc_day);
+            let epoc_day = starknet::get_block_timestamp() / DAY_EPOC_DIVISOR;
+            let mut player_stats = store.get_player_daily_state(get_caller_address(), epoc_day);
             let player = store.get_player(get_caller_address());
 
             // init player stats if doesnt play today yet   
             player_stats = try_init_player_stats(ref store, @player_stats, player.last_try, epoc_day);
 
-            assert(player_stats.remaining_tries > 0, 'You have no more attempts!');
-            assert(player_stats.won == false, 'You already won today!');
+            assert(player_stats.remaining_tries != 0, Errors::OUT_OF_ATTEMPTS);
+            assert(player_stats.won == false, Errors::ALREADY_WON);
 
             let word_of_the_day = store.get_word(epoc_day);
             let attempt_hits = update_player_word_attempts(
@@ -56,21 +64,28 @@ mod guess_system {
             );
 
             let mut player_won = false;
+
             if attempt_hits == ALL_HITS {
-                let mut points: u64 = if player_stats.remaining_tries == TOTAL_DAILY_TRIES {
+                player_won = true;
+
+                // update player score
+                let daily_points = if player_stats.remaining_tries == TOTAL_DAILY_TRIES {
                     BONUS_POINTS + POINT_UNIT * player_stats.remaining_tries.into()
                 } else {
-                        POINT_UNIT * player_stats.remaining_tries.into()
+                    POINT_UNIT * player_stats.remaining_tries.into()
                 };
 
-                // ctx.world.execute('point_system', array![points.into()]);
-                // ctx.world.execute('ranking_system', array![ctx.origin.into()]);
-                player_won = true;
+                let mut player_score = store.get_player_score(player.player);
+                player_score.score += daily_points;
+                store.set_player_score(player_score);
+
+                // update ranking
+                ranking_system::update(self.world(), player.player.into(), player_score.score);
             }
             
             player_stats.won = player_won;
             player_stats.remaining_tries -= 1;
-            store.set_player_stats(player_stats);
+            store.set_player_daily_state(player_stats);
 
             // Set last try to today
             let player = Player { player: player.player, points: player.points, last_try: epoc_day };
@@ -79,16 +94,16 @@ mod guess_system {
     }
 
     fn try_init_player_stats(
-        ref store: Store, player_stats: @PlayerStats, player_last_try: u64, epoc_day: u64
-    ) -> PlayerStats {
+        ref store: Store, player_stats: @PlayerDailyState, player_last_try: u64, epoc_day: u64
+    ) -> PlayerDailyState {
         if epoc_day > player_last_try {
-            let player_stats = PlayerStats {
+            let player_stats = PlayerDailyState {
                 player: *player_stats.player,
                 epoc_day: *player_stats.epoc_day,
                 won: false,
                 remaining_tries: TOTAL_DAILY_TRIES
             };
-            store.set_player_stats(player_stats);
+            store.set_player_daily_state(player_stats);
             player_stats
         } else { 
             *player_stats
@@ -96,7 +111,7 @@ mod guess_system {
     }
 
     fn update_player_word_attempts(
-        ref store: Store, player_stats: PlayerStats, player_word: u32, word_of_the_day: u32
+        ref store: Store, player_stats: PlayerDailyState, player_word: u32, word_of_the_day: u32
     ) -> u32 {
         let word_of_the_day_array = characters_into_array(word_of_the_day);
         let player_word_array = characters_into_array(player_word);
